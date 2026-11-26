@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+}
+
+enum OrderStatus {
+  PAID
+}
+
+enum PromoType {
+  PERCENT
+  FIXED
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
+// Semua nominal uang disimpan sebagai integer Rupiah (tanpa floating point).
+model Product {
+  id         Int         @id @default(autoincrement())
+  name       String      @unique
+  categoryId Int
+  price      Int
+  stock      Int
+  imageUrl   String?
+  category   Category    @relation(fields: [categoryId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+}
+
+model Order {
+  id            Int           @id @default(autoincrement())
+  invoiceNumber String        @unique
+  subtotal      Int
+  discount      Int           @default(0)
+  tax           Int
+  total         Int
+  promoCode     String?
+  paymentMethod PaymentMethod
+  status        OrderStatus   @default(PAID)
+  createdAt     DateTime      @default(now())
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  unitPrice Int
+  subtotal  Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Promo {
+  id       Int       @id @default(autoincrement())
+  code     String    @unique
+  type     PromoType
+  value    Int
+  minOrder Int       @default(0)
+  isActive Boolean   @default(true)
+  startsAt DateTime?
+  endsAt   DateTime?
+}
+
+// Penghitung nomor invoice per tahun, dinaikkan secara atomik saat checkout.
+model InvoiceCounter {
+  year Int @id
+  last Int
+}
